@@ -14,12 +14,8 @@
 # define PIPEX_H
 
 # include "./libft/libft.h"
-# include <unistd.h>
-# include <stdlib.h>
 # include <fcntl.h>
 # include <sys/wait.h>
-# include <stdio.h>
-# include <string.h>
 
 # define ERR_ARGS "Error: Invalid number of arguments"
 # define ERR_PIPE "Error: Pipe creation failed"
@@ -52,24 +48,24 @@ typedef struct s_pipex
 // main.c
 int     main(int argc, char **argv, char **envp);
 
-// init
+// init.c
 void    init_pipex(t_pipex *pipex, int argc, char **argv, char **envp);
 void    init_process(t_pipex *pipex);
 
-// execute
+// execute.c
 void    launch_pipeline(t_pipex *pipex);
 void    execute_cmd(t_pipex *pipex, int i);
 char    *find_path(char *cmd, char **envp);
 
-// pipes
+// pipes.c
 void    create_pipes(t_pipex *pipex);
 void    close_pipes(t_pipex *pipex);
 void    redirect_io(int in_fd, int out_fd);
 
-// here_doc (bonus)
+// here_doc.c (bonus)
 void    handle_here_doc(t_pipex *pipex);
 
-// utils
+// utils.c
 void    error_exit(char *msg);
 void    perror_exit(char *msg);
 void    free_pipex(t_pipex *pipex);

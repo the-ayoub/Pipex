@@ -12,6 +12,58 @@
 
 #include "pipex.h"
 
+void    launch_pipeline(t_pipex *pipex)
+{
+    
+}
+
+void    execute_cmd(t_pipex *pipex, int i);
+{
+    char *path;
+
+    path = find_path(pipex->procs[i].comd,pipex->envp);
+    if(!path)
+    {
+        free_pipex(pipex);
+        error_exit(ERR_CMD);
+    }
+    if(execve(path, pipex->procs[i].args, pipex->envp) == -1)
+    {
+        free(path);
+        free_pipex(pipex);
+        perror_exit("execve");
+    }
+    free(path);
+}
+
+void error_exit(char *msg)
+{
+    write(STDERR_FILENO, msg, strlen(msg));
+    write(STDERR_FILENO, "\n", 1);
+    exit(EXIT_FAILURE);
+}
+
+void perror_exit(char *msg)
+{
+    perror(msg);
+    exit(EXIT_FAILURE);
+}
+
+void free_array(char **array)
+{
+    int i;
+    
+    if (!array)
+        return;
+    i = 0;
+    while (array[i])
+    {
+        free(array[i]);
+        i++;
+    }
+    free(array);
+}
+
 void    free_pipex(t_pipex *pipex)
 {
     int i;
@@ -29,6 +81,12 @@ void    free_pipex(t_pipex *pipex)
     }
     if(pipex->procs)
         free(pipex->procs);
+}
+
+void redirect_io(int in_fd, int out_fd)
+{
+    dup2(in_fd, STDIN_FILENO);
+    dup2(out_fd, STDOUT_FILENO);
 }
 
 void    close_pipes(t_pipex *pipex)
@@ -75,11 +133,17 @@ void    launch_pipeline(t_pipex *pipex)
                 dup2(pipex->fd_out,STDOUT_FILENO);
             else
                 redirect_io(pipex->procs[i -1 ].pipe_fd[0],pipex->procs[i].pipe_fd[1]);       
+            execute_cmd(pipex, i);
         }
         i++;
-        execute_cmd(pipex, i);
     }
     close_pipes(pipex);
+    i = 0;
+    while(i < pipex->cmd_count)
+    {
+        waitpid(pipex->procs[i].pid, NULL, 0);
+        i++;
+    }
 }
 
 void init_process(t_pipex *pipex)
