@@ -6,15 +6,43 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/20 16:47:45 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/21 13:08:58 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/22 15:57:53 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "pipex.h"
 
-void    launch_pipeline(t_pipex *pipex)
+char	*find_path(char *cmd, char **envp)
 {
-    
+	char	**paths;
+	char	*part_path;
+	char	*full_path;
+	int		i;
+
+	i = 0;
+	while (envp[i] && ft_strncmp(envp[i], "PATH=", 5) != 0)
+		i++;
+	if (!envp[i])
+		return (NULL);
+
+	paths = ft_split(envp[i] + 5, ':');
+	if (!paths)
+		return (NULL);
+	i = 0;
+	while (paths[i])
+	{
+		part_path = ft_strjoin(paths[i], "/");
+		full_path = ft_strjoin(part_path, cmd);
+		free(part_path);
+		if (!full_path)
+			return (free_array(paths), NULL);
+		if (access(full_path, X_OK) == 0)
+			return (free_array(paths), full_path);
+		free(full_path);
+		i++;
+	}
+	free_array(paths);
+	return (NULL);
 }
 
 void    execute_cmd(t_pipex *pipex, int i);
