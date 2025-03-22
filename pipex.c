@@ -176,6 +176,8 @@ void    launch_pipeline(t_pipex *pipex)
             else
                 redirect_io(pipex->procs[i -1 ].pipe_fd[0],pipex->procs[i].pipe_fd[1]);       
             close_unused_pipes(pipex,i);
+            //close_pipes(pipex);
+            
             execute_cmd(pipex, i);
         }
         i++;
