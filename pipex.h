@@ -6,7 +6,7 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/11 15:57:44 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/21 10:44:07 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/22 18:08:57 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,6 +61,7 @@ char    *find_path(char *cmd, char **envp);
 void    create_pipes(t_pipex *pipex);
 void    close_pipes(t_pipex *pipex);
 void    redirect_io(int in_fd, int out_fd);
+void    close_unused_pipes(t_pipex *pipex, int i);
 
 // here_doc.c (bonus)
 void    handle_here_doc(t_pipex *pipex);

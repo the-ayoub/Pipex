@@ -6,7 +6,7 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/20 16:47:45 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/22 15:57:53 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/22 18:16:00 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,6 @@ char	*find_path(char *cmd, char **envp)
 		i++;
 	if (!envp[i])
 		return (NULL);
-
 	paths = ft_split(envp[i] + 5, ':');
 	if (!paths)
 		return (NULL);
@@ -117,6 +116,21 @@ void redirect_io(int in_fd, int out_fd)
     dup2(out_fd, STDOUT_FILENO);
 }
 
+void close_unused_pipes(t_pipex *pipex, int i)
+{
+    int j;
+
+    j = 0;
+    while (j < pipex->cmd_count - 1)
+    {
+        if (j != i - 1)
+            close(pipex->procs[j].pipe_fd[0]);
+        if (j != i)
+            close(pipex->procs[j].pipe_fd[1]);
+        j++;
+    }
+}
+
 void    close_pipes(t_pipex *pipex)
 {
     int i;
@@ -161,6 +175,7 @@ void    launch_pipeline(t_pipex *pipex)
                 dup2(pipex->fd_out,STDOUT_FILENO);
             else
                 redirect_io(pipex->procs[i -1 ].pipe_fd[0],pipex->procs[i].pipe_fd[1]);       
+            close_unused_pipes(pipex,i);
             execute_cmd(pipex, i);
         }
         i++;
@@ -194,7 +209,7 @@ void init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
     pipex->argc = argc;
     pipex->argv = argv;
     pipex->envp = envp;
-    pipex->here_doc = is_here_doc(argv[1]);
+    pipex->here_doc = ft_strncmp(argv[1]);
     if (pipex->here_doc != 0)
     {
         pipex->limiter = argv[2];
