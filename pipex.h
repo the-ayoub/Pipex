@@ -64,7 +64,7 @@ void    redirect_io(int in_fd, int out_fd);
 void    close_unused_pipes(t_pipex *pipex, int i);
 
 // here_doc.c (bonus)
-void    handle_here_doc(t_pipex *pipex);
+//void    handle_here_doc(t_pipex *pipex);
 
 // utils.c
 void    error_exit(char *msg);

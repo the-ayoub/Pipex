@@ -44,11 +44,11 @@ char	*find_path(char *cmd, char **envp)
 	return (NULL);
 }
 
-void    execute_cmd(t_pipex *pipex, int i);
+void    execute_cmd(t_pipex *pipex, int i)
 {
     char *path;
 
-    path = find_path(pipex->procs[i].comd,pipex->envp);
+    path = find_path(pipex->procs[i].cmd,pipex->envp);
     if(!path)
     {
         free_pipex(pipex);
@@ -160,8 +160,8 @@ void    launch_pipeline(t_pipex *pipex)
     int i;
 
     create_pipes(pipex);
-    if(pipex->here_doc)
-        handle_here_doc(pipex);
+   // if(pipex->here_doc)
+       // handle_here_doc(pipex);
     i = 0;
     while(i < pipex->cmd_count)
     {
@@ -209,19 +209,19 @@ void init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
     pipex->argc = argc;
     pipex->argv = argv;
     pipex->envp = envp;
-    pipex->here_doc = ft_strncmp(argv[1]);
+    pipex->here_doc = ft_strncmp(argv[1],"here_doc",8);
     if (pipex->here_doc != 0)
     {
         pipex->limiter = argv[2];
         pipex->cmd_count = argc - 4;
-        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_APPEND, 0644);
+        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
         pipex->here_doc = 1;
     }
     else
     {
         pipex->cmd_count = argc - 3;
         pipex->fd_in = open(argv[1], O_RDONLY);
-        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_APPEND, 0644);
     }
     if (pipex->fd_out < 0 || (!pipex->here_doc && pipex->fd_in < 0))
         perror_exit(ERR_FILE);
