@@ -6,7 +6,7 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/11 15:57:44 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/22 18:08:57 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/24 17:42:12 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,13 +35,14 @@ typedef struct s_process
 typedef struct s_pipex 
 {
     int     argc;      
-    char    **argv;   
-    char    **envp;    
-    int     fd_in;     
-    int     fd_out;   
+    char    **argv;
+    char    **envp;
+    int     fd_in;
+    int     fd_out;
     int     here_doc;   // Flag para here_doc
     char    *limiter;   // Delimitador para here_doc
     int     cmd_count;  // Número de comandos
+    int     here_doc_pipe[2]; // Pipe específico para here_doc
     t_process *procs;   // Array de procesos
 } t_pipex;
 
@@ -64,7 +65,7 @@ void    redirect_io(int in_fd, int out_fd);
 void    close_unused_pipes(t_pipex *pipex, int i);
 
 // here_doc.c (bonus)
-//void    handle_here_doc(t_pipex *pipex);
+void    handle_here_doc(t_pipex *pipex);
 
 // utils.c
 void    error_exit(char *msg);
