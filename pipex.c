@@ -6,12 +6,52 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/20 16:47:45 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/22 18:16:00 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/24 14:16:47 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "pipex.h"
 
+char *get_next_line(int fd)
+{
+    char buffer[1024];
+    int i = 0;
+    char c;
+    
+    while (read(fd, &c, 1) > 0 && c != '\n' && i < 1023)
+        buffer[i++] = c;
+        
+    if (i == 0 && c != '\n')
+        return NULL;
+        
+    buffer[i++] = '\n';
+    buffer[i] = '\0';
+    
+    return ft_strdup(buffer);
+}
+
+void handle_here_doc(t_pipex *pipex)
+{
+    char *line;
+    int limiter_len;
+    
+    limiter_len = ft_strlen(pipex->limiter);
+    write(STDOUT_FILENO, "heredoc> ", 9);
+    line = get_next_line(STDIN_FILENO);
+    while (line)
+    {
+        if (ft_strncmp(line, pipex->limiter, limiter_len) == 0 && 
+            (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
+        {
+            free(line);
+            break;
+        }
+        write(pipex->procs[0].pipe_fd[1], line, ft_strlen(line));
+        free(line);
+        write(STDOUT_FILENO, "heredoc> ", 9);
+        line = get_next_line(STDIN_FILENO);
+    }
+}
 char	*find_path(char *cmd, char **envp)
 {
 	char	**paths;
@@ -155,7 +195,63 @@ void    create_pipes(t_pipex *pipex)
     }
 }
 
-void    launch_pipeline(t_pipex *pipex)
+void launch_pipeline(t_pipex *pipex)
+{
+    int i;
+
+    create_pipes(pipex);
+    
+    if (pipex->here_doc)
+        handle_here_doc(pipex);
+        
+    i = 0;
+    while (i < pipex->cmd_count)
+    {
+        if ((pipex->procs[i].pid = fork()) < 0)
+            perror_exit(ERR_FORK);
+            
+        if (pipex->procs[i].pid == 0) // Proceso hijo
+        {
+            // Configurar la entrada estándar
+            if (i == 0)
+            {
+                if (pipex->here_doc)
+                    // Para here_doc, la entrada viene del primer pipe
+                    dup2(pipex->procs[0].pipe_fd[0], STDIN_FILENO);
+                else
+                    // Para modo normal, la entrada viene del archivo de entrada
+                    dup2(pipex->fd_in, STDIN_FILENO);
+            }
+            else
+            {
+                // Para comandos intermedios y finales, la entrada viene del pipe anterior
+                dup2(pipex->procs[i-1].pipe_fd[0], STDIN_FILENO);
+            }
+            
+            // Configurar la salida estándar
+            if (i == pipex->cmd_count - 1)
+                // Último comando: salida al archivo
+                dup2(pipex->fd_out, STDOUT_FILENO);
+            else
+                // Comandos intermedios: salida al siguiente pipe
+                dup2(pipex->procs[i].pipe_fd[1], STDOUT_FILENO);
+                
+            close_unused_pipes(pipex, i);
+            execute_cmd(pipex, i);
+        }
+        i++;
+    }
+    
+    close_pipes(pipex);
+    
+    i = 0;
+    while (i < pipex->cmd_count)
+    {
+        waitpid(pipex->procs[i].pid, NULL, 0);
+        i++;
+    }
+}
+/*void    launch_pipeline(t_pipex *pipex)
 {
     int i;
 
@@ -189,7 +285,7 @@ void    launch_pipeline(t_pipex *pipex)
         waitpid(pipex->procs[i].pid, NULL, 0);
         i++;
     }
-}
+}*/
 
 void init_process(t_pipex *pipex)
 {
@@ -207,6 +303,41 @@ void init_process(t_pipex *pipex)
 }
 
 void init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
+{
+    pipex->argc = argc;
+    pipex->argv = argv;
+    pipex->envp = envp;
+    
+    // Corregir la detección de here_doc
+    pipex->here_doc = (ft_strncmp(argv[1], "here_doc", 8) == 0) ? 1 : 0;
+    
+    if (pipex->here_doc)
+    {
+        // Modo here_doc
+        pipex->limiter = argv[2];
+        pipex->cmd_count = argc - 4;
+        pipex->fd_in = -1; // Inicializar
+        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    }
+    else
+    {
+        // Modo normal
+        pipex->cmd_count = argc - 3;
+        pipex->fd_in = open(argv[1], O_RDONLY);
+        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_APPEND, 0644);
+    }
+    
+    if (pipex->fd_out < 0 || (!pipex->here_doc && pipex->fd_in < 0))
+        perror_exit(ERR_FILE);
+        
+    pipex->procs = malloc(sizeof(t_process) * pipex->cmd_count);
+    if (!pipex->procs)
+        perror_exit(ERR_MEM);
+        
+    init_process(pipex);
+}
+
+/*void init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
 {
     pipex->argc = argc;
     pipex->argv = argv;
@@ -231,7 +362,7 @@ void init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
     if (!pipex->procs)
         perror_exit(ERR_MEM);
     init_process(pipex);
-}
+}*/
 
 int main(int argc, char **argv, char **envp)
 {
