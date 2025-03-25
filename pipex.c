@@ -6,61 +6,62 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/20 16:47:45 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/24 17:38:44 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/25 20:54:39 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "pipex.h"
 
-char *get_next_line(int fd)
+void ft_waitpid(t_pipex *pipex)
 {
-    char buffer[1024];
-    int i = 0;
-    char c;
-    
-    while (read(fd, &c, 1) > 0 && c != '\n' && i < 1023)
-        buffer[i++] = c;
-        
-    if (i == 0 && c != '\n')
-        return NULL;
-        
-    buffer[i++] = '\n';
-    buffer[i] = '\0';
-    
-    return ft_strdup(buffer);
+	int i;
+
+	close_pipes(pipex);
+	i = 0;
+	while (i < pipex->cmd_count)
+	{
+		waitpid(pipex->procs[i].pid, NULL, 0);
+		i++;
+	}
 }
 
-void handle_here_doc(t_pipex *pipex)
+char	*get_next_line(int fd)
 {
-    char *line;
-    int limiter_len;
-    
-    limiter_len = ft_strlen(pipex->limiter);
-    
-    // Instrucciones para el usuario
-    write(STDOUT_FILENO, "heredoc> ", 9);
-    
-    // Usar get_next_line o una función similar para leer líneas
-    line = get_next_line(STDIN_FILENO);
-    
-    while (line)
-    {
-        // Verificar si la línea es el delimitador
-        if (ft_strncmp(line, pipex->limiter, limiter_len) == 0 && 
-            (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
-        {
-            free(line);
-            break;
-        }
-        
-        // Escribir la línea en el pipe para el primer comando
-        write(pipex->here_doc_pipe[1], line, ft_strlen(line));
-        free(line);
-        
-        // Pedir la siguiente línea
-        write(STDOUT_FILENO, "heredoc> ", 9);
-        line = get_next_line(STDIN_FILENO);
-    }
+	char	buffer[1024];
+	int		i;
+	char	c;
+
+	i = 0;
+	while (read(fd, &c, 1) > 0 && c != '\n' && i < 1023)
+		buffer[i++] = c;
+	if (i == 0 && c != '\n')
+		return (NULL);
+	buffer[i++] = '\n';
+	buffer[i] = '\0';
+	return (ft_strdup(buffer));
+}
+
+void	handle_here_doc(t_pipex *pipex)
+{
+	char	*line;
+	int		limiter_len;
+
+	limiter_len = ft_strlen(pipex->limiter);
+	write(STDOUT_FILENO, "heredoc> ", 9);
+	line = get_next_line(STDIN_FILENO);
+	while (line)
+	{
+		if (ft_strncmp(line, pipex->limiter, limiter_len) == 0
+			&& (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
+		{
+			free(line);
+			break ;
+		}
+		write(pipex->here_doc_pipe[1], line, ft_strlen(line));
+		free(line);
+		write(STDOUT_FILENO, "heredoc> ", 9);
+		line = get_next_line(STDIN_FILENO);
+	}
 }
 
 char	*find_path(char *cmd, char **envp)
@@ -95,115 +96,119 @@ char	*find_path(char *cmd, char **envp)
 	return (NULL);
 }
 
-void    execute_cmd(t_pipex *pipex, int i)
+void	execute_cmd(t_pipex *pipex, int i)
 {
-    char *path;
+	char	*path;
 
-    path = find_path(pipex->procs[i].cmd,pipex->envp);
-    if(!path)
-    {
-        free_pipex(pipex);
-        error_exit(ERR_CMD);
-    }
-    if(execve(path, pipex->procs[i].args, pipex->envp) == -1)
-    {
-        free(path);
-        free_pipex(pipex);
-        perror_exit("execve");
-    }
-    free(path);
+	path = find_path(pipex->procs[i].args[0], pipex->envp);
+	if (!path)
+	{
+		free_pipex(pipex);
+		error_exit(ERR_CMD);
+	}
+	if (execve(path, pipex->procs[i].args, pipex->envp) == -1)
+	{
+		free(path);
+		free_pipex(pipex);
+		perror_exit("execve");
+	}
+	free(path);
 }
 
-void error_exit(char *msg)
+void	error_exit(char *msg)
 {
-    write(STDERR_FILENO, msg, strlen(msg));
-    write(STDERR_FILENO, "\n", 1);
-    exit(EXIT_FAILURE);
+	write(STDERR_FILENO, msg, strlen(msg));
+	write(STDERR_FILENO, "\n", 1);
+	exit(EXIT_FAILURE);
 }
 
-void perror_exit(char *msg)
+void	perror_exit(char *msg)
 {
-    perror(msg);
-    exit(EXIT_FAILURE);
+	perror(msg);
+	exit(EXIT_FAILURE);
 }
 
-void free_array(char **array)
+void	free_array(char **array)
 {
-    int i;
-    
-    if (!array)
-        return;
-    i = 0;
-    while (array[i])
-    {
-        free(array[i]);
-        i++;
-    }
-    free(array);
+	int	i;
+
+	if (!array)
+		return ;
+	i = 0;
+	while (array[i])
+	{
+		free(array[i]);
+		i++;
+	}
+	free(array);
 }
 
-void    free_pipex(t_pipex *pipex)
+void	free_pipex(t_pipex *pipex)
 {
-    int i;
+	int	i;
 
-    if(pipex->fd_in >= 0)
-        close(pipex->fd_in);
-    if(pipex->fd_out >= 0)
-        close(pipex->fd_out);
-    i = 0;
-    while(i < pipex->cmd_count)
-    {
-        if (pipex->procs[i].args)
-            free_array(pipex->procs[i].args);
-        i++;
-    }
-    if(pipex->procs)
-        free(pipex->procs);
+	if (pipex->fd_in >= 0)
+		close(pipex->fd_in);
+	if (pipex->fd_out >= 0)
+		close(pipex->fd_out);
+	i = 0;
+	while (i < pipex->cmd_count)
+	{
+		if (pipex->procs[i].args)
+			free_array(pipex->procs[i].args);
+		i++;
+	}
+	if (pipex->procs)
+		free(pipex->procs);
 }
 
-void redirect_io(int in_fd, int out_fd)
+void	close_unused_pipes(t_pipex *pipex, int i)
 {
-    dup2(in_fd, STDIN_FILENO);
-    dup2(out_fd, STDOUT_FILENO);
+	int	j;
+
+	j = 0;
+	while (j < pipex->cmd_count - 1)
+	{
+		if (j != i - 1)
+			close(pipex->procs[j].pipe_fd[0]);
+		if (j != i)
+			close(pipex->procs[j].pipe_fd[1]);
+		j++;
+	}
 }
 
-void close_unused_pipes(t_pipex *pipex, int i)
+void	close_pipes(t_pipex *pipex)
 {
-    int j;
+	int	i;
 
-    j = 0;
-    while (j < pipex->cmd_count - 1)
-    {
-        if (j != i - 1)
-            close(pipex->procs[j].pipe_fd[0]);
-        if (j != i)
-            close(pipex->procs[j].pipe_fd[1]);
-        j++;
-    }
+	i = 0;
+	while (i < pipex->cmd_count)
+	{
+		if (pipex->procs[i].pipe_fd[0] >= 0)
+		{
+			close(pipex->procs[i].pipe_fd[0]);
+			pipex->procs[i].pipe_fd[0] = -1;
+		}
+		if (pipex->procs[i].pipe_fd[1] >= 0)
+		{
+			close(pipex->procs[i].pipe_fd[1]);
+			pipex->procs[i].pipe_fd[1] = -1;
+		}
+		i++;
+	}
 }
 
-void    close_pipes(t_pipex *pipex)
+void	create_pipes(t_pipex *pipex)
 {
-    int i;
-    i = 0;
-    while(i < pipex->cmd_count)
-    {
-        close(pipex->procs[i].pipe_fd[0]);
-        close(pipex->procs[i].pipe_fd[1]);
-        i++;
-    }
-}
+	int	i;
 
-void    create_pipes(t_pipex *pipex)
-{
-    int i;
-    i = 0;
-    while(i < pipex->cmd_count - 1)
-    {
-        if(pipe(pipex->procs[i].pipe_fd) == -1)
-            perror_exit(ERR_PIPE);
-        i++;
-    }
+	i = 0;
+	while (i < pipex->cmd_count - 1)
+	{
+		if (pipe(pipex->procs[i].pipe_fd) == -1)
+			perror_exit(ERR_PIPE);
+		i++;
+	}
 }
 
 void launch_pipeline(t_pipex *pipex)
@@ -252,65 +257,56 @@ void launch_pipeline(t_pipex *pipex)
         }
         i++;
     }
-    
-    close_pipes(pipex);
-    
-    i = 0;
-    while (i < pipex->cmd_count)
-    {
-        waitpid(pipex->procs[i].pid, NULL, 0);
-        i++;
-    }
+	ft_waitpid(pipex);
 }
 
-void init_process(t_pipex *pipex)
+void	init_process(t_pipex *pipex)
 {
-    int i = 0;
-    int cmd_index;
+	int	i;
+	int	cmd_index;
 
-    while (i < pipex->cmd_count)
-    {
-        cmd_index = i + 2 + pipex->here_doc;
-        pipex->procs[i].cmd = pipex->argv[cmd_index];
-        pipex->procs[i].args = ft_split(pipex->argv[cmd_index], ' ');
-        pipex->procs[i].pid = -1;       
-        i++;
-    }
+	i = 0;
+	while (i < pipex->cmd_count)
+	{
+		cmd_index = i + 2 + pipex->here_doc;
+		pipex->procs[i].cmd = pipex->argv[cmd_index];
+		pipex->procs[i].args = ft_split(pipex->argv[cmd_index], ' ');
+		pipex->procs[i].pid = -1;
+		pipex->procs[i].pipe_fd[0] = -1;
+		pipex->procs[i].pipe_fd[1] = -1;
+		i++;
+	}
 }
 
-void init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
+void	init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
 {
-    pipex->argc = argc;
-    pipex->argv = argv;
-    pipex->envp = envp;
-    
-    // Corregir la detección de here_doc
-    pipex->here_doc = (ft_strncmp(argv[1], "here_doc", 8) == 0) ? 1 : 0;
-    
-    if (pipex->here_doc)
-    {
-        // Modo here_doc
-        pipex->limiter = argv[2];
-        pipex->cmd_count = argc - 4;
-        pipex->fd_in = -1; // Inicializar
-        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_APPEND , 0644);
-    }
-    else
-    {
-        // Modo normal
-        pipex->cmd_count = argc - 3;
-        pipex->fd_in = open(argv[1], O_RDONLY);
-        pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_TRUNC , 0644);
-    }
-    
-    if (pipex->fd_out < 0 || (!pipex->here_doc && pipex->fd_in < 0))
-        perror_exit(ERR_FILE);
-        
-    pipex->procs = malloc(sizeof(t_process) * pipex->cmd_count);
-    if (!pipex->procs)
-        perror_exit(ERR_MEM);
-        
-    init_process(pipex);
+	pipex->argc = argc;
+	pipex->argv = argv;
+	pipex->envp = envp;
+	pipex->here_doc = (ft_strncmp(argv[1], "here_doc", 8) == 0) ? 1 : 0;
+	if (pipex->here_doc)
+	{
+		pipex->limiter = argv[2];
+		pipex->cmd_count = argc - 4;
+		pipex->fd_in = -1;
+		pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_APPEND,
+				0644);
+	}
+	else
+	{
+		pipex->cmd_count = argc - 3;
+		pipex->fd_in = open(argv[1], O_RDONLY);
+		pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_TRUNC,
+				0644);
+	}
+	if (access(argv[1], F_OK) != 0)
+		perror(ERR_FILE);
+	else if (!pipex->here_doc && pipex->fd_in < 0)
+		perror_exit(ERR_FILE);
+	pipex->procs = malloc(sizeof(t_process) * pipex->cmd_count);
+	if (!pipex->procs)
+		perror_exit(ERR_MEM);
+	init_process(pipex);
 }
 
 int main(int argc, char **argv, char **envp)
