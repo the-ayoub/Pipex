@@ -6,23 +6,30 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/20 16:47:45 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/25 20:54:39 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/28 03:04:13 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "pipex.h"
 
-void ft_waitpid(t_pipex *pipex)
+int	ft_waitpid(t_pipex *pipex)
 {
-	int i;
+	int	status;
+	int	last_exit_status;
+	int	i;
 
+	last_exit_status = 0;
 	close_pipes(pipex);
 	i = 0;
 	while (i < pipex->cmd_count)
 	{
-		waitpid(pipex->procs[i].pid, NULL, 0);
+		waitpid(pipex->procs[i].pid, &status, 0);
 		i++;
 	}
+	waitpid(pipex->procs[pipex->cmd_count - 1].pid, &status, 0);
+	if (WIFEXITED(status))
+		last_exit_status = WEXITSTATUS(status);
+	return (last_exit_status);
 }
 
 char	*get_next_line(int fd)
@@ -41,27 +48,30 @@ char	*get_next_line(int fd)
 	return (ft_strdup(buffer));
 }
 
-void	handle_here_doc(t_pipex *pipex)
+void handle_here_doc(t_pipex *pipex)
 {
-	char	*line;
-	int		limiter_len;
-
-	limiter_len = ft_strlen(pipex->limiter);
-	write(STDOUT_FILENO, "heredoc> ", 9);
-	line = get_next_line(STDIN_FILENO);
-	while (line)
-	{
-		if (ft_strncmp(line, pipex->limiter, limiter_len) == 0
-			&& (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
-		{
-			free(line);
-			break ;
-		}
-		write(pipex->here_doc_pipe[1], line, ft_strlen(line));
-		free(line);
-		write(STDOUT_FILENO, "heredoc> ", 9);
-		line = get_next_line(STDIN_FILENO);
-	}
+    char *line;
+    int limiter_len;
+    
+    if (pipe(pipex->here_doc_pipe) == -1)
+        perror_exit("Pipe creation failed");
+    limiter_len = ft_strlen(pipex->limiter);
+    while (1)
+    {
+        write(STDOUT_FILENO, "heredoc> ", 9);
+        line = get_next_line(STDIN_FILENO);
+        if (!line)
+            break;
+        if (ft_strncmp(line, pipex->limiter, limiter_len) == 0 && 
+            (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
+        {
+            free(line);
+            break;
+        }
+        write(pipex->here_doc_pipe[1], line, ft_strlen(line));
+        free(line);
+    }
+    close(pipex->here_doc_pipe[1]);
 }
 
 char	*find_path(char *cmd, char **envp)
@@ -216,48 +226,36 @@ void launch_pipeline(t_pipex *pipex)
     int i;
 
     create_pipes(pipex);
-    
     if (pipex->here_doc)
         handle_here_doc(pipex);
-        
     i = 0;
     while (i < pipex->cmd_count)
     {
         if ((pipex->procs[i].pid = fork()) < 0)
             perror_exit(ERR_FORK);
-            
-        if (pipex->procs[i].pid == 0) // Proceso hijo
+        if (pipex->procs[i].pid == 0)
         {
-            // Configurar la entrada estándar
             if (i == 0)
             {
                 if (pipex->here_doc)
-                    // Para here_doc, la entrada viene del primer pipe
-                    dup2(pipex->procs[0].pipe_fd[0], STDIN_FILENO);
+                {
+                    dup2(pipex->here_doc_pipe[0], STDIN_FILENO);
+                    close(pipex->here_doc_pipe[0]);
+                }
                 else
-                    // Para modo normal, la entrada viene del archivo de entrada
                     dup2(pipex->fd_in, STDIN_FILENO);
             }
             else
-            {
-                // Para comandos intermedios y finales, la entrada viene del pipe anterior
-                dup2(pipex->procs[i-1].pipe_fd[0], STDIN_FILENO);
-            }
-            
-            // Configurar la salida estándar
+                dup2(pipex->procs[i - 1].pipe_fd[0], STDIN_FILENO);
             if (i == pipex->cmd_count - 1)
-                // Último comando: salida al archivo
                 dup2(pipex->fd_out, STDOUT_FILENO);
             else
-                // Comandos intermedios: salida al siguiente pipe
                 dup2(pipex->procs[i].pipe_fd[1], STDOUT_FILENO);
-                
             close_unused_pipes(pipex, i);
             execute_cmd(pipex, i);
         }
         i++;
     }
-	ft_waitpid(pipex);
 }
 
 void	init_process(t_pipex *pipex)
@@ -266,6 +264,9 @@ void	init_process(t_pipex *pipex)
 	int	cmd_index;
 
 	i = 0;
+	pipex->procs = malloc(sizeof(t_process) * pipex->cmd_count);
+	if (!pipex->procs)
+		perror_exit(ERR_MEM);
 	while (i < pipex->cmd_count)
 	{
 		cmd_index = i + 2 + pipex->here_doc;
@@ -299,26 +300,23 @@ void	init_pipex(t_pipex *pipex, int argc, char **argv, char **envp)
 		pipex->fd_out = open(argv[argc - 1], O_WRONLY | O_CREAT | O_TRUNC,
 				0644);
 	}
-	if (access(argv[1], F_OK) != 0)
+	if (access(argv[1], F_OK) != 0 && !pipex->here_doc)
 		perror(ERR_FILE);
 	else if (!pipex->here_doc && pipex->fd_in < 0)
 		perror_exit(ERR_FILE);
-	pipex->procs = malloc(sizeof(t_process) * pipex->cmd_count);
-	if (!pipex->procs)
-		perror_exit(ERR_MEM);
 	init_process(pipex);
 }
 
-int main(int argc, char **argv, char **envp)
+int	main(int argc, char **argv, char **envp)
 {
-    t_pipex pipex;
-    
-    if (argc < 5)
-        error_exit(ERR_ARGS);
-    
-    init_pipex(&pipex, argc, argv, envp);
-    launch_pipeline(&pipex);
-    free_pipex(&pipex);
-    
-    return (0);
+	int		exit_status;
+	t_pipex	pipex;
+
+	if (argc < 5)
+		error_exit(ERR_ARGS);
+	init_pipex(&pipex, argc, argv, envp);
+	launch_pipeline(&pipex);
+	exit_status = ft_waitpid(&pipex);
+	free_pipex(&pipex);
+	return (exit_status);
 }
