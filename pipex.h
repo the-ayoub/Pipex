@@ -6,7 +6,7 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/11 15:57:44 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/27 18:02:29 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/28 13:20:36 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -57,7 +57,8 @@ void			init_process(t_pipex *pipex);
 void			launch_pipeline(t_pipex *pipex);
 int				ft_waitpid(t_pipex *pipex);
 void			execute_cmd(t_pipex *pipex, int i);
-char			*find_path(char *cmd, char **envp);
+char			*find_path(char *cmd, char **envp, int i);
+void			is_child(t_pipex *pipex, int i);
 
 // pipes.c
 void			create_pipes(t_pipex *pipex);

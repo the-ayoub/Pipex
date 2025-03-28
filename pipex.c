@@ -6,7 +6,7 @@
 /*   By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/20 16:47:45 by aybelhaj          #+#    #+#             */
-/*   Updated: 2025/03/28 03:04:13 by aybelhaj         ###   ########.fr       */
+/*   Updated: 2025/03/28 13:21:48 by aybelhaj         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,40 +48,38 @@ char	*get_next_line(int fd)
 	return (ft_strdup(buffer));
 }
 
-void handle_here_doc(t_pipex *pipex)
+void	handle_here_doc(t_pipex *pipex)
 {
-    char *line;
-    int limiter_len;
-    
-    if (pipe(pipex->here_doc_pipe) == -1)
-        perror_exit("Pipe creation failed");
-    limiter_len = ft_strlen(pipex->limiter);
-    while (1)
-    {
-        write(STDOUT_FILENO, "heredoc> ", 9);
-        line = get_next_line(STDIN_FILENO);
-        if (!line)
-            break;
-        if (ft_strncmp(line, pipex->limiter, limiter_len) == 0 && 
-            (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
-        {
-            free(line);
-            break;
-        }
-        write(pipex->here_doc_pipe[1], line, ft_strlen(line));
-        free(line);
-    }
-    close(pipex->here_doc_pipe[1]);
+	char	*line;
+	int		limiter_len;
+
+	if (pipe(pipex->here_doc_pipe) == -1)
+		perror_exit("Pipe creation failed");
+	limiter_len = ft_strlen(pipex->limiter);
+	while (1)
+	{
+		write(STDOUT_FILENO, "heredoc> ", 9);
+		line = get_next_line(STDIN_FILENO);
+		if (!line)
+			break ;
+		if (ft_strncmp(line, pipex->limiter, limiter_len) == 0
+			&& (line[limiter_len] == '\n' || line[limiter_len] == '\0'))
+		{
+			free(line);
+			break ;
+		}
+		write(pipex->here_doc_pipe[1], line, ft_strlen(line));
+		free(line);
+	}
+	close(pipex->here_doc_pipe[1]);
 }
 
-char	*find_path(char *cmd, char **envp)
+char	*find_path(char *cmd, char **envp, int i)
 {
 	char	**paths;
 	char	*part_path;
 	char	*full_path;
-	int		i;
 
-	i = 0;
 	while (envp[i] && ft_strncmp(envp[i], "PATH=", 5) != 0)
 		i++;
 	if (!envp[i])
@@ -102,15 +100,14 @@ char	*find_path(char *cmd, char **envp)
 		free(full_path);
 		i++;
 	}
-	free_array(paths);
-	return (NULL);
+	return (free_array(paths), NULL);
 }
 
 void	execute_cmd(t_pipex *pipex, int i)
 {
 	char	*path;
 
-	path = find_path(pipex->procs[i].args[0], pipex->envp);
+	path = find_path(pipex->procs[i].args[0], pipex->envp, 0);
 	if (!path)
 	{
 		free_pipex(pipex);
@@ -221,41 +218,44 @@ void	create_pipes(t_pipex *pipex)
 	}
 }
 
-void launch_pipeline(t_pipex *pipex)
+void	is_child(t_pipex *pipex, int i)
 {
-    int i;
+	if (i == 0)
+	{
+		if (pipex->here_doc)
+		{
+			dup2(pipex->here_doc_pipe[0], STDIN_FILENO);
+			close(pipex->here_doc_pipe[0]);
+		}
+		else
+			dup2(pipex->fd_in, STDIN_FILENO);
+	}
+	else
+		dup2(pipex->procs[i - 1].pipe_fd[0], STDIN_FILENO);
+	if (i == pipex->cmd_count - 1)
+		dup2(pipex->fd_out, STDOUT_FILENO);
+	else
+		dup2(pipex->procs[i].pipe_fd[1], STDOUT_FILENO);
+	close_unused_pipes(pipex, i);
+	execute_cmd(pipex, i);
+}
 
-    create_pipes(pipex);
-    if (pipex->here_doc)
-        handle_here_doc(pipex);
-    i = 0;
-    while (i < pipex->cmd_count)
-    {
-        if ((pipex->procs[i].pid = fork()) < 0)
-            perror_exit(ERR_FORK);
-        if (pipex->procs[i].pid == 0)
-        {
-            if (i == 0)
-            {
-                if (pipex->here_doc)
-                {
-                    dup2(pipex->here_doc_pipe[0], STDIN_FILENO);
-                    close(pipex->here_doc_pipe[0]);
-                }
-                else
-                    dup2(pipex->fd_in, STDIN_FILENO);
-            }
-            else
-                dup2(pipex->procs[i - 1].pipe_fd[0], STDIN_FILENO);
-            if (i == pipex->cmd_count - 1)
-                dup2(pipex->fd_out, STDOUT_FILENO);
-            else
-                dup2(pipex->procs[i].pipe_fd[1], STDOUT_FILENO);
-            close_unused_pipes(pipex, i);
-            execute_cmd(pipex, i);
-        }
-        i++;
-    }
+void	launch_pipeline(t_pipex *pipex)
+{
+	int	i;
+
+	create_pipes(pipex);
+	if (pipex->here_doc)
+		handle_here_doc(pipex);
+	i = 0;
+	while (i < pipex->cmd_count)
+	{
+		if ((pipex->procs[i].pid = fork()) < 0)
+			perror_exit(ERR_FORK);
+		if (pipex->procs[i].pid == 0)
+			is_child(pipex, i);
+		i++;
+	}
 }
 
 void	init_process(t_pipex *pipex)
