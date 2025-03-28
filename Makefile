@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: aybelhaj <aybelhaj@student.42barcelona.co  +#+  +:+       +#+         #
+#    By: aybelhaj <aybelhaj@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/11/25 21:50:13 by aybelhaj          #+#    #+#              #
-#    Updated: 2025/01/14 16:02:08 by aybelhaj         ###   ########.fr        #
+#    Updated: 2025/03/28 16:43:56 by aybelhaj         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,8 +17,7 @@ CC		=	cc
 CFLAGS	=	-g -Wall -Wextra -Werror 
 
 OBJDIR	=	build
-SRCS	=	pipex.c
-
+SRCS	=	utils.c here_doc.c pipes.c execute.c init.c main.c
 OBJS	=	$(addprefix $(OBJDIR)/, ${SRCS:.c=.o})
 LIBFT_PATH	=	./libft
 LIBFT		=	$(LIBFT_PATH)/libft.a
